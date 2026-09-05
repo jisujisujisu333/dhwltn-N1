@@ -17,7 +17,7 @@ st.set_page_config(
 
 
 # =========================
-# 영화관 포스터 스타일
+# 블루 영화 포스터 스타일
 # =========================
 
 st.markdown("""
@@ -27,10 +27,10 @@ st.markdown("""
     background:
         radial-gradient(
             circle at 50% 0%,
-            #651313 0%,
-            #320909 30%,
-            #150505 65%,
-            #080808 100%
+            #183d68 0%,
+            #0d223d 30%,
+            #071525 65%,
+            #03080f 100%
         );
 
     color: white;
@@ -40,13 +40,13 @@ st.markdown("""
 /* 제목 */
 
 h1 {
-    color: #ff4d4d !important;
+    color: #70cfff !important;
     font-weight: 900;
     letter-spacing: -1px;
 }
 
 h2, h3 {
-    color: white !important;
+    color: #ffffff !important;
     font-weight: 800;
 }
 
@@ -54,15 +54,15 @@ h2, h3 {
 /* 설명 */
 
 .stCaption {
-    color: #cfcfcf !important;
+    color: #a9c5dc !important;
 }
 
 
-/* 날짜 선택 */
+/* 날짜 */
 
 [data-testid="stDateInput"] {
-    background-color: rgba(25, 10, 10, 0.8);
-    border: 1px solid #682020;
+    background-color: rgba(8, 25, 43, 0.85);
+    border: 1px solid #24527c;
     border-radius: 12px;
     padding: 5px;
 }
@@ -74,165 +74,273 @@ h2, h3 {
     background:
         linear-gradient(
             135deg,
-            rgba(80, 15, 15, 0.9),
-            rgba(20, 10, 10, 0.95)
+            rgba(17, 52, 82, 0.95),
+            rgba(5, 18, 31, 0.95)
         );
 
-    border: 1px solid #742323;
+    border: 1px solid #285d88;
     border-radius: 14px;
     padding: 10px;
 
     box-shadow:
-        0 4px 18px rgba(0, 0, 0, 0.45);
+        0 5px 20px rgba(0, 0, 0, 0.5);
 }
 
 
 [data-testid="stMetricLabel"] {
-    color: #bbbbbb !important;
+    color: #a9c5dc !important;
 }
 
 
 [data-testid="stMetricValue"] {
-    color: #ff5555 !important;
+    color: #65c7ff !important;
     font-size: 23px !important;
     font-weight: 800;
 }
 
 
-/* 알림 */
+/* =========================
+   TOP 3 카드
+   ========================= */
 
-.stAlert {
-    background-color: rgba(35, 12, 12, 0.9);
-    border-radius: 12px;
+.top3-container {
+    display: flex;
+    gap: 14px;
+    margin: 8px 0 18px 0;
 }
 
 
-/* 표 전체 */
+.top3-card {
+    flex: 1;
 
-.movie-table-box {
+    min-height: 105px;
+
+    padding: 14px 16px;
+
+    border-radius: 16px;
+
     background:
         linear-gradient(
             145deg,
-            rgba(35, 10, 10, 0.97),
-            rgba(12, 12, 12, 0.98)
+            rgba(18, 55, 88, 0.95),
+            rgba(5, 17, 30, 0.98)
         );
 
-    border: 1px solid #632020;
+    border: 1px solid #285d88;
+
+    box-shadow:
+        0 6px 25px rgba(0, 0, 0, 0.5);
+}
+
+
+.top3-card.first {
+    border: 2px solid #ffe16b;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(60, 65, 43, 0.95),
+            rgba(8, 25, 40, 0.98)
+        );
+
+    box-shadow:
+        0 0 22px rgba(255, 225, 107, 0.18);
+}
+
+
+.top3-card.second {
+    border: 2px solid #b9d7e8;
+}
+
+
+.top3-card.third {
+    border: 2px solid #cd9b70;
+}
+
+
+.top3-rank {
+    font-size: 25px;
+    font-weight: 900;
+    margin-bottom: 5px;
+}
+
+
+.top3-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+.top3-info {
+    color: #9ec4df;
+    font-size: 12px;
+    margin-top: 7px;
+}
+
+
+/* =========================
+   영화 순위표
+   ========================= */
+
+.movie-table-box {
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(9, 29, 48, 0.98),
+            rgba(3, 11, 19, 0.98)
+        );
+
+    border: 1px solid #245477;
+
     border-radius: 16px;
 
     overflow: hidden;
 
     box-shadow:
-        0 8px 30px rgba(0, 0, 0, 0.55);
+        0 8px 30px rgba(0, 0, 0, 0.6);
 
     margin-top: 5px;
 }
 
 
-/* 표 */
-
 .movie-table {
+
     width: 100%;
+
     border-collapse: collapse;
-    color: #eeeeee;
+
+    color: #e8f5ff;
+
     font-size: 13px;
 }
 
 
-/* 표 제목 */
-
 .movie-table thead {
+
     background:
         linear-gradient(
             90deg,
-            #4d0b0b,
-            #751414,
-            #4d0b0b
+            #0b2945,
+            #164d78,
+            #0b2945
         );
 }
 
 
 .movie-table th {
+
     color: #ffffff;
+
     font-weight: 800;
+
     padding: 11px 8px;
-    border-bottom: 1px solid #8b2b2b;
+
+    border-bottom:
+        1px solid #3575a5;
+
     text-align: center;
 }
 
-
-/* 표 내용 */
 
 .movie-table td {
+
     padding: 9px 8px;
-    border-bottom: 1px solid rgba(130, 40, 40, 0.35);
+
+    border-bottom:
+        1px solid rgba(50, 110, 150, 0.25);
+
     text-align: center;
 }
 
 
-/* 영화명 */
-
 .movie-name {
+
     text-align: left !important;
+
     font-weight: 650;
-    color: #f1f1f1;
+
+    color: #edf8ff;
 }
 
-
-/* 마우스를 올렸을 때 */
 
 .movie-table tbody tr:hover {
-    background: rgba(180, 30, 30, 0.15);
+
+    background:
+        rgba(55, 160, 220, 0.12);
 }
 
 
-/* 1~3위 강조 */
-
-.rank-1 {
-    font-size: 18px;
-    font-weight: 900;
-}
-
-.rank-2 {
-    font-size: 16px;
-    font-weight: 800;
-}
-
-.rank-3 {
-    font-size: 15px;
-    font-weight: 800;
-}
-
-
-/* 순위 숫자 */
+/* 순위 */
 
 .rank-normal {
-    font-weight: 700;
+
+    font-weight: 800;
+
+    color: #65c7ff;
 }
 
 
-/* 상승 */
+.rank-1 {
+
+    font-size: 20px;
+
+    font-weight: 900;
+
+    color: #ffe16b;
+}
+
+
+.rank-2 {
+
+    font-size: 18px;
+
+    font-weight: 900;
+
+    color: #c9e3f2;
+}
+
+
+.rank-3 {
+
+    font-size: 17px;
+
+    font-weight: 900;
+
+    color: #e2a97a;
+}
+
+
+/* 순위 변화 */
 
 .up {
-    color: #ff4d4d;
+
+    color: #ff6b6b;
+
     font-size: 18px;
+
     font-weight: 900;
 }
 
-
-/* 하락 */
 
 .down {
-    color: #4da6ff;
+
+    color: #55b9ff;
+
     font-size: 18px;
+
     font-weight: 900;
 }
 
 
-/* 유지 */
-
 .same {
-    color: #888888;
+
+    color: #7890a3;
+
     font-size: 17px;
 }
 
@@ -240,11 +348,16 @@ h2, h3 {
 /* 그래프 제목 */
 
 .chart-title {
+
     color: #ffffff;
+
     font-size: 17px;
+
     font-weight: 800;
 
-    border-left: 4px solid #ff3b30;
+    border-left:
+        4px solid #4dbdff;
+
     padding-left: 9px;
 
     margin-bottom: 4px;
@@ -438,11 +551,65 @@ df["display_movieNm"] = df.apply(
 )
 
 
-# =========================
-# 1위 영화
-# =========================
+# ==================================================
+# TOP 3 크게 표시
+# ==================================================
+
+st.subheader("🏆 오늘의 TOP 3")
+
+
+top3 = df.head(3)
+
+
+top3_html = """
+<div class="top3-container">
+"""
+
+
+medals = ["🥇", "🥈", "🥉"]
+classes = ["first", "second", "third"]
+
+
+for i, (_, row) in enumerate(top3.iterrows()):
+
+    top3_html += f"""
+    <div class="top3-card {classes[i]}">
+
+        <div class="top3-rank">
+            {medals[i]} {int(row["rank"])}위
+        </div>
+
+        <div class="top3-title">
+            {row["movieNm"]}
+        </div>
+
+        <div class="top3-info">
+            오늘 관객 {row["audiCnt"]:,}명
+            &nbsp; · &nbsp;
+            누적 {row["audiAcc"]:,}명
+        </div>
+
+    </div>
+    """
+
+
+top3_html += """
+</div>
+"""
+
+
+st.markdown(
+    top3_html,
+    unsafe_allow_html=True
+)
+
+
+# ==================================================
+# 1위 상세 정보
+# ==================================================
 
 top = df.iloc[0]
+
 
 st.subheader(
     f"🥇 1위 — {top['display_movieNm']}"
@@ -451,15 +618,18 @@ st.subheader(
 
 c1, c2, c3 = st.columns(3)
 
+
 c1.metric(
     "관객수",
     f"{top['audiCnt']:,}명"
 )
 
+
 c2.metric(
     "누적 관객수",
     f"{top['audiAcc']:,}명"
 )
+
 
 c3.metric(
     "스크린수",
@@ -480,7 +650,7 @@ table = df.head(10).copy()
 
 
 # =========================
-# 순위 변동 표시
+# 순위 변동
 # =========================
 
 def make_arrow(value):
@@ -498,7 +668,7 @@ def make_arrow(value):
 
 
 # =========================
-# HTML 표 만들기
+# HTML 표
 # =========================
 
 html = """
@@ -524,19 +694,17 @@ html = """
 """
 
 
-# 순위별 색상
-
 rank_colors = [
-    "#ff3b30",
-    "#ff9500",
-    "#ffd60a",
-    "#34c759",
-    "#00c7be",
-    "#30a9de",
-    "#5856d6",
-    "#af52de",
-    "#ff2d55",
-    "#ff6b6b"
+    "#ffe16b",
+    "#c9e3f2",
+    "#e2a97a",
+    "#65c7ff",
+    "#5db7e8",
+    "#55a6d9",
+    "#4b96c7",
+    "#4b8db7",
+    "#4783a8",
+    "#417999"
 ]
 
 
@@ -546,9 +714,41 @@ for _, row in table.iterrows():
 
     color = rank_colors[rank - 1]
 
-    # 순위 변동
+    change = make_arrow(
+        row["rankInten"]
+    )
 
-    change = make_arrow(row["rankInten"])
+
+    # 순위 표시
+
+    if rank == 1:
+
+        rank_html = (
+            '<span class="rank-1">🥇</span>'
+        )
+
+    elif rank == 2:
+
+        rank_html = (
+            '<span class="rank-2">🥈</span>'
+        )
+
+    elif rank == 3:
+
+        rank_html = (
+            '<span class="rank-3">🥉</span>'
+        )
+
+    else:
+
+        rank_html = (
+            f'<span class="rank-normal" '
+            f'style="color:{color}">'
+            f'{rank}</span>'
+        )
+
+
+    # 순위 변동
 
     if change == "↑":
 
@@ -566,38 +766,6 @@ for _, row in table.iterrows():
 
         change_html = (
             '<span class="same">−</span>'
-        )
-
-
-    # 순위 강조
-
-    if rank == 1:
-
-        rank_html = (
-            f'<span class="rank-1" '
-            f'style="color:{color}">🥇</span>'
-        )
-
-    elif rank == 2:
-
-        rank_html = (
-            f'<span class="rank-2" '
-            f'style="color:{color}">🥈</span>'
-        )
-
-    elif rank == 3:
-
-        rank_html = (
-            f'<span class="rank-3" '
-            f'style="color:{color}">🥉</span>'
-        )
-
-    else:
-
-        rank_html = (
-            f'<span class="rank-normal" '
-            f'style="color:{color}">'
-            f'{rank}</span>'
         )
 
 
@@ -667,6 +835,7 @@ top10 = (
     .copy()
 )
 
+
 top10["display_movieNm"] = (
     top10.apply(
         make_movie_name,
@@ -700,10 +869,15 @@ with g1:
         unsafe_allow_html=True
     )
 
+
     fig1 = px.bar(
-        top10.sort_values("audiCnt"),
+
+        top10.sort_values(
+            "audiCnt"
+        ),
 
         x="audiCnt",
+
         y="display_movieNm",
 
         orientation="h",
@@ -716,16 +890,16 @@ with g1:
         },
 
         color_discrete_sequence=[
-            "#ff3b30",
-            "#ff9500",
-            "#ffcc00",
-            "#34c759",
-            "#00c7be",
-            "#30a9de",
-            "#5856d6",
-            "#af52de",
-            "#ff2d55",
-            "#ff6b6b"
+            "#65c7ff",
+            "#4db5ef",
+            "#45a8df",
+            "#3b9bd0",
+            "#328fc1",
+            "#2c83b2",
+            "#2877a3",
+            "#246b94",
+            "#215f85",
+            "#1d5376"
         ]
     )
 
@@ -734,7 +908,7 @@ with g1:
 
         paper_bgcolor="rgba(0,0,0,0)",
 
-        plot_bgcolor="rgba(15,5,5,0.75)",
+        plot_bgcolor="rgba(3,14,25,0.75)",
 
         font=dict(
             color="white",
@@ -753,7 +927,7 @@ with g1:
         showlegend=False,
 
         xaxis=dict(
-            gridcolor="#3b2020"
+            gridcolor="#23435b"
         )
     )
 
@@ -800,16 +974,16 @@ with g2:
         color="display_movieNm",
 
         color_discrete_sequence=[
-            "#ff3b30",
-            "#ff9500",
-            "#ffcc00",
-            "#34c759",
-            "#00c7be",
-            "#30a9de",
-            "#5856d6",
-            "#af52de",
-            "#ff2d55",
-            "#8e8e93"
+            "#65c7ff",
+            "#4db5ef",
+            "#45a8df",
+            "#3b9bd0",
+            "#328fc1",
+            "#2c83b2",
+            "#2877a3",
+            "#246b94",
+            "#215f85",
+            "#1d5376"
         ]
     )
 
@@ -818,7 +992,7 @@ with g2:
 
         paper_bgcolor="rgba(0,0,0,0)",
 
-        plot_bgcolor="rgba(15,5,5,0.75)",
+        plot_bgcolor="rgba(3,14,25,0.75)",
 
         font=dict(
             color="white",
