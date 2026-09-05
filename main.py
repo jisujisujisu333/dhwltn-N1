@@ -1,57 +1,89 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 
+# 페이지 설정
 st.set_page_config(
-    page_title="서울 연평균 기온 변화",
+    page_title="서울 100년 기온 변화",
     page_icon="🌡️",
     layout="wide"
 )
 
-st.title("🌡️ 서울의 100년간 연평균 기온 변화")
-st.write("1907년 이후 서울의 연평균 기온이 어떻게 변해 왔는지 확인해 보세요.")
+# 제목
+st.title("🌡️ 서울의 100년 연평균 기온 변화")
+st.write("1926년부터 2025년까지 서울의 연평균 기온이 어떻게 변했는지 알아봅니다.")
+
+# 데이터 주소
+url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/seoul.csv"
 
 # 데이터 불러오기
-url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/seoul.csv"
-df = pd.read_csv(url)
+@st.cache_data
+def load_data():
+    df = pd.read_csv(url)
 
-# 날짜를 날짜 형식으로 변환
-df["날짜"] = pd.to_datetime(df["날짜"])
+    # 날짜를 날짜 형식으로 변환
+    df["날짜"] = pd.to_datetime(df["날짜"])
 
-# 연도 추출
-df["연도"] = df["날짜"].dt.year
+    # 연도 열 만들기
+    df["연도"] = df["날짜"].dt.year
+
+    # 평균기온을 숫자로 변환
+    df["평균기온"] = pd.to_numeric(df["평균기온"], errors="coerce")
+
+    return df
+
+
+df = load_data()
+
+# 1926년 ~ 2025년 데이터만 선택
+df_100 = df[(df["연도"] >= 1926) & (df["연도"] <= 2025)]
 
 # 연도별 평균기온 계산
 yearly_temp = (
-    df.groupby("연도")["평균기온"]
+    df_100.groupby("연도")["평균기온"]
     .mean()
     .reset_index()
 )
 
-# 100년 이상의 전체 데이터 중 최근 100년 표시
-yearly_temp = yearly_temp.tail(100)
-
 # 그래프
-st.subheader("📈 연도별 연평균 기온")
+fig, ax = plt.subplots(figsize=(14, 6))
 
-st.line_chart(
-    yearly_temp,
-    x="연도",
-    y="평균기온",
-    x_label="연도",
-    y_label="평균기온 (℃)"
+ax.plot(
+    yearly_temp["연도"],
+    yearly_temp["평균기온"],
+    linewidth=2
 )
 
-# 간단한 정보
+ax.set_title("서울의 100년 연평균 기온 변화", fontsize=18)
+ax.set_xlabel("연도", fontsize=12)
+ax.set_ylabel("연평균 기온 (℃)", fontsize=12)
+ax.grid(True, alpha=0.3)
+
+st.pyplot(fig)
+
+# 간단한 정보 표시
+first_temp = yearly_temp.iloc[0]["평균기온"]
+last_temp = yearly_temp.iloc[-1]["평균기온"]
+change = last_temp - first_temp
+
 col1, col2, col3 = st.columns(3)
 
-with col1:
-    st.metric("분석 시작 연도", f"{yearly_temp['연도'].min()}년")
+col1.metric(
+    "1926년 평균기온",
+    f"{first_temp:.1f} ℃"
+)
 
-with col2:
-    st.metric("분석 종료 연도", f"{yearly_temp['연도'].max()}년")
+col2.metric(
+    "2025년 평균기온",
+    f"{last_temp:.1f} ℃"
+)
 
-with col3:
-    변화 = yearly_temp["평균기온"].iloc[-1] - yearly_temp["평균기온"].iloc[0]
-    st.metric("처음과 마지막 연도의 차이", f"{변화:+.1f} ℃")
+col3.metric(
+    "100년간 기온 변화",
+    f"{change:+.1f} ℃"
+)
 
-st.caption("출처: 기상청 서울 기온 데이터(seoul.csv)")
+st.subheader("📊 연도별 평균기온 데이터")
+st.dataframe(yearly_temp, use_container_width=True)
+
+st.caption("자료: 서울 기온 관측 데이터")
