@@ -1,4 +1,4 @@
-# 어제의 박스오피스 — KOBIS 일별 박스오피스 API
+# 일별 박스오피스 — KOBIS 일별 박스오피스 API
 import datetime
 
 import pandas as pd
@@ -7,7 +7,7 @@ import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="어제의 박스오피스",
+    page_title="일별 박스오피스",
     page_icon="🎬",
     layout="wide"
 )
@@ -37,7 +37,7 @@ def fetch_boxoffice(date_str):
     params = {
         "key": API_KEY,
         "targetDt": date_str,
-        "itemPerPage": 50  # 50위까지 가져오기
+        "itemPerPage": 50
     }
 
     res = requests.get(URL, params=params, timeout=10)
@@ -46,7 +46,7 @@ def fetch_boxoffice(date_str):
     return res.json()
 
 
-st.title("🎬 어제의 박스오피스")
+st.title("🎬 일별 박스오피스")
 st.caption(f"조회 날짜: {selected_date}")
 
 try:
@@ -85,17 +85,20 @@ if not movies:
 df = pd.DataFrame(movies)
 
 
-# 숫자가 글자로 들어오기 때문에 숫자로 변환한다
+# 숫자로 변환
 for col in ["rank", "rankInten", "audiCnt", "audiAcc", "scrnCnt"]:
     df[col] = pd.to_numeric(df[col], errors="coerce")
 
 
-# 영화 이름에 트로피를 붙인다
+# 순위순으로 정렬
+df = df.sort_values("rank")
+
+
+# 상위 5개 영화에 트로피 추가
 def make_movie_name(row):
     movie_name = row["movieNm"]
 
-    # 누적 관객수가 100만 명을 넘으면 트로피 표시
-    if row["audiAcc"] > 1_000_000:
+    if row["rank"] <= 5:
         movie_name = "🏆 " + movie_name
 
     return movie_name
@@ -105,14 +108,14 @@ df["display_movieNm"] = df.apply(make_movie_name, axis=1)
 
 
 # 1위 영화
-top = df.sort_values("rank").iloc[0]
+top = df.iloc[0]
 
-st.subheader(f"🥇 1위 — {top['movieNm']}")
+st.subheader(f"🥇 1위 — {top['display_movieNm']}")
 
 c1, c2, c3 = st.columns(3)
 
 c1.metric(
-    "어제 관객수",
+    "관객수",
     f"{top['audiCnt']:,}명"
 )
 
@@ -127,10 +130,13 @@ c3.metric(
 )
 
 
-# 전체 순위표
+# =========================
+# 전체 순위표 - 20위까지
+# =========================
+
 st.subheader("📋 박스오피스 순위표")
 
-table = df.sort_values("rank")[
+table = df.head(20)[
     [
         "rank",
         "display_movieNm",
@@ -143,7 +149,7 @@ table = df.sort_values("rank")[
 ].copy()
 
 
-# 순위 변동 화살표 만들기
+# 순위 변동 화살표
 def make_arrow(value):
     if value > 0:
         return "↑"
@@ -168,7 +174,7 @@ table.columns = [
 ]
 
 
-# 화살표 색상 지정
+# 화살표 색상
 def color_arrow(value):
     if value == "↑":
         return "color: red; font-weight: bold;"
@@ -191,29 +197,43 @@ st.dataframe(
 )
 
 
+# =========================
 # 관객수 상위 10편 그래프
+# =========================
+
 st.subheader("📊 관객수 상위 10편")
 
 top10 = (
     df.sort_values("audiCnt", ascending=False)
     .head(10)
+    .copy()
 )
+
+# 그래프에 사용할 영화 이름에도 트로피 표시
+top10["display_movieNm"] = top10.apply(
+    make_movie_name,
+    axis=1
+)
+
 
 fig = px.bar(
     top10,
-    x="movieNm",
+    x="display_movieNm",
     y="audiCnt",
+    color="display_movieNm",
     labels={
-        "movieNm": "영화명",
-        "audiCnt": "어제 관객수"
+        "display_movieNm": "영화명",
+        "audiCnt": "관객수"
     },
-    title="관객수 상위 10편"
+    title="관객수 상위 10편",
+    color_discrete_sequence=px.colors.qualitative.Set3
 )
 
 fig.update_layout(
     xaxis_title="영화명",
     yaxis_title="관객수",
-    xaxis_tickangle=-30
+    xaxis_tickangle=-30,
+    showlegend=False
 )
 
 st.plotly_chart(
