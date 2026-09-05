@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import pandas as pd
 import requests
@@ -334,4 +333,3 @@ st.caption(
 st.caption(
     "※ 데이터는 KOBIS API에서 제공하는 일일 박스오피스 집계 결과를 사용합니다."
 )
-```
