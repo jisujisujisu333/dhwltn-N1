@@ -20,38 +20,75 @@ st.set_page_config(
 
 
 # =========================
-# 영화관 느낌의 어두운 테마
+# 영화관 느낌의 배경
 # =========================
 
 st.markdown("""
 <style>
 
 .stApp {
-    background-color: #111111;
-    color: #f5f5f5;
+    background:
+        radial-gradient(
+            circle at top,
+            #3b1010 0%,
+            #1a0808 35%,
+            #0d0d0d 75%
+        );
+    color: white;
 }
 
-h1, h2, h3 {
-    color: #ffffff;
+/* 제목 */
+h1 {
+    color: #ff4d4d !important;
+    font-weight: 800;
 }
 
+h2, h3 {
+    color: #ffffff !important;
+}
+
+/* 설명 */
 .stCaption {
-    color: #aaaaaa;
+    color: #cccccc !important;
 }
 
-[data-testid="stMetric"] {
+/* 날짜 선택 */
+[data-testid="stDateInput"] {
     background-color: #1c1c1c;
-    border: 1px solid #333333;
-    padding: 18px;
+    border-radius: 10px;
+}
+
+/* 지표 카드 */
+[data-testid="stMetric"] {
+    background: linear-gradient(
+        135deg,
+        #241010,
+        #181818
+    );
+
+    border: 1px solid #6e2525;
+
+    padding: 12px;
+
     border-radius: 12px;
 }
 
-[data-testid="stDataFrame"] {
-    background-color: #181818;
+/* 지표 숫자 */
+[data-testid="stMetricValue"] {
+    color: #ff5555 !important;
+    font-size: 24px !important;
 }
 
+/* 표 */
+[data-testid="stDataFrame"] {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* 알림창 */
 .stAlert {
-    background-color: #1c1c1c;
+    background-color: #1c1515;
+    border-radius: 10px;
 }
 
 </style>
@@ -89,7 +126,7 @@ yesterday = (
 # =========================
 
 selected_date = st.date_input(
-    "📅 조회할 날짜를 선택하세요",
+    "📅 조회할 날짜",
     value=yesterday,
     max_value=yesterday
 )
@@ -107,7 +144,7 @@ def fetch_boxoffice(date_str):
     params = {
         "key": API_KEY,
         "targetDt": date_str,
-        "itemPerPage": 50
+        "itemPerPage": 10
     }
 
     res = requests.get(
@@ -128,7 +165,7 @@ def fetch_boxoffice(date_str):
 st.title("🎬 일별 박스오피스")
 
 st.caption(
-    f"조회 날짜: {selected_date}"
+    f"조회 날짜: {selected_date} · 한국 시간 기준"
 )
 
 
@@ -151,13 +188,13 @@ except requests.RequestException:
 
 
 # =========================
-# API 오류 확인
+# API 오류
 # =========================
 
 if "faultInfo" in data:
 
     st.error(
-        f"API가 오류를 돌려주었습니다: "
+        f"API 오류: "
         f"{data['faultInfo'].get('message', '')}"
     )
 
@@ -192,7 +229,7 @@ df = pd.DataFrame(movies)
 
 
 # =========================
-# 숫자 변환
+# 숫자로 변환
 # =========================
 
 for col in [
@@ -223,7 +260,7 @@ df = (
 
 
 # =========================
-# 상위 5개 영화 트로피
+# 상위 5개 트로피
 # =========================
 
 def make_movie_name(row):
@@ -251,7 +288,6 @@ df["display_movieNm"] = df.apply(
 
 top = df.iloc[0]
 
-
 st.subheader(
     f"🥇 1위 — {top['display_movieNm']}"
 )
@@ -265,12 +301,10 @@ c1.metric(
     f"{top['audiCnt']:,}명"
 )
 
-
 c2.metric(
     "누적 관객수",
     f"{top['audiAcc']:,}명"
 )
-
 
 c3.metric(
     "스크린수",
@@ -278,16 +312,16 @@ c3.metric(
 )
 
 
-# =========================
-# 순위표
-# =========================
+# ==================================================
+# 순위표 10위
+# ==================================================
 
 st.subheader(
-    "📋 박스오피스 순위표"
+    "📋 박스오피스 순위표 TOP 10"
 )
 
 
-table = df.head(20)[
+table = df.head(10)[
     [
         "rank",
         "display_movieNm",
@@ -348,7 +382,7 @@ def color_arrow(value):
     if value == "↑":
 
         return (
-            "color: red; "
+            "color: #ff4444; "
             "font-weight: bold;"
         )
 
@@ -372,15 +406,17 @@ st.dataframe(
     styled_table,
     hide_index=True,
     width="stretch",
-    height=700
+    height=390
 )
 
 
 # ==================================================
-# 그래프 영역
+# 그래프
 # ==================================================
 
-st.subheader("📊 박스오피스 그래프")
+st.subheader(
+    "📊 관객수 TOP 10"
+)
 
 
 top10 = (
@@ -403,11 +439,8 @@ top10["display_movieNm"] = (
 
 
 # ==================================================
-# 그래프 1 — 가로 막대그래프
+# 그래프 1 — 알록달록 막대그래프
 # ==================================================
-
-st.markdown("### 🎞️ 관객수 TOP 10")
-
 
 fig1 = px.bar(
     top10.sort_values("audiCnt"),
@@ -417,30 +450,47 @@ fig1 = px.bar(
 
     orientation="h",
 
-    color="audiCnt",
-
-    color_continuous_scale=[
-        "#3b0a0a",
-        "#7a1111",
-        "#c62828",
-        "#ff5252"
-    ],
+    color="display_movieNm",
 
     labels={
         "audiCnt": "관객수",
         "display_movieNm": "영화"
     },
 
-    title="관객수 상위 10편"
+    title="🎞️ 영화별 관객수",
+
+    color_discrete_sequence=[
+        "#ff4d4d",
+        "#ff8c42",
+        "#ffd166",
+        "#06d6a0",
+        "#4dabf7",
+        "#7b61ff",
+        "#e056fd",
+        "#ff6b9d",
+        "#00c2d7",
+        "#a8e063"
+    ]
 )
 
 
 fig1.update_layout(
+
     paper_bgcolor="#111111",
     plot_bgcolor="#111111",
 
     font=dict(
-        color="white"
+        color="white",
+        size=12
+    ),
+
+    height=380,
+
+    margin=dict(
+        l=20,
+        r=20,
+        t=60,
+        b=30
     ),
 
     xaxis=dict(
@@ -452,9 +502,7 @@ fig1.update_layout(
         title=""
     ),
 
-    coloraxis_colorbar=dict(
-        title="관객수"
-    )
+    showlegend=False
 )
 
 
@@ -477,40 +525,64 @@ st.plotly_chart(
 # 그래프 2 — 도넛 그래프
 # ==================================================
 
-st.markdown("### 🍿 관객 점유율")
+st.markdown(
+    "### 🍿 상위 10편 관객 점유율"
+)
 
 
 fig2 = px.pie(
+
     top10,
 
     names="display_movieNm",
+
     values="audiCnt",
 
-    hole=0.45,
+    hole=0.50,
 
-    title="상위 10편 관객 점유율",
+    title="🎟️ 관객 점유율",
 
-    labels={
-        "display_movieNm": "영화",
-        "audiCnt": "관객수"
-    },
+    color="display_movieNm",
 
-    color_discrete_sequence=(
-        px.colors.qualitative.Dark24
-    )
+    color_discrete_sequence=[
+        "#ff3b30",
+        "#ff9500",
+        "#ffcc00",
+        "#34c759",
+        "#00c7be",
+        "#30a9de",
+        "#5856d6",
+        "#af52de",
+        "#ff2d55",
+        "#8e8e93"
+    ]
 )
 
 
 fig2.update_layout(
+
     paper_bgcolor="#111111",
     plot_bgcolor="#111111",
 
     font=dict(
-        color="white"
+        color="white",
+        size=11
+    ),
+
+    height=400,
+
+    margin=dict(
+        l=10,
+        r=10,
+        t=60,
+        b=20
     ),
 
     legend=dict(
-        bgcolor="#111111"
+        bgcolor="#111111",
+        font=dict(
+            color="white"
+        )
     )
 )
 
