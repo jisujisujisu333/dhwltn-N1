@@ -107,7 +107,10 @@ def make_movie_name(row):
 df["display_movieNm"] = df.apply(make_movie_name, axis=1)
 
 
+# =========================
 # 1위 영화
+# =========================
+
 top = df.iloc[0]
 
 st.subheader(f"🥇 1위 — {top['display_movieNm']}")
@@ -131,12 +134,12 @@ c3.metric(
 
 
 # =========================
-# 전체 순위표 - 20위까지
+# 전체 순위표 - 30위까지
 # =========================
 
 st.subheader("📋 박스오피스 순위표")
 
-table = df.head(20)[
+table = df.head(30)[
     [
         "rank",
         "display_movieNm",
@@ -201,7 +204,7 @@ st.dataframe(
 # 관객수 상위 10편 그래프
 # =========================
 
-st.subheader("📊 관객수 상위 10편")
+st.subheader("📈 관객수 상위 10편")
 
 top10 = (
     df.sort_values("audiCnt", ascending=False)
@@ -209,31 +212,51 @@ top10 = (
     .copy()
 )
 
-# 그래프에 사용할 영화 이름에도 트로피 표시
+# 그래프용 영화 이름
 top10["display_movieNm"] = top10.apply(
     make_movie_name,
     axis=1
 )
 
+# 순위 표시용
+top10["순위"] = top10["rank"].astype(int)
 
-fig = px.bar(
+
+# 점 그래프
+fig = px.scatter(
     top10,
-    x="display_movieNm",
+    x="순위",
     y="audiCnt",
+    size="audiCnt",
     color="display_movieNm",
-    labels={
-        "display_movieNm": "영화명",
-        "audiCnt": "관객수"
+    text="display_movieNm",
+    hover_data={
+        "순위": True,
+        "display_movieNm": False,
+        "audiCnt": ":,",
+        "audiAcc": ":,"
     },
-    title="관객수 상위 10편",
-    color_discrete_sequence=px.colors.qualitative.Set3
+    labels={
+        "순위": "순위",
+        "audiCnt": "관객수",
+        "display_movieNm": "영화"
+    },
+    title="관객수 상위 10편 비교",
+    color_discrete_sequence=px.colors.qualitative.Set2
+)
+
+fig.update_traces(
+    textposition="top center"
 )
 
 fig.update_layout(
-    xaxis_title="영화명",
+    xaxis=dict(
+        dtick=1
+    ),
+    xaxis_title="순위",
     yaxis_title="관객수",
-    xaxis_tickangle=-30,
-    showlegend=False
+    showlegend=True,
+    legend_title="영화"
 )
 
 st.plotly_chart(
