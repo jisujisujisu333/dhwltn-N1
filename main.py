@@ -209,7 +209,8 @@ st.write(
 st.write(
     f"전체 일별 평균기온의 평균은 "
     f"**{temperatures.mean():.1f} ℃**입니다."
-)import streamlit as st
+)
+import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
