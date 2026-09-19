@@ -1,663 +1,251 @@
-import datetime
-import pandas as pd
-import plotly.express as px
-import requests
 import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
 
+# --------------------------------------------------
+# 기본 설정
+# --------------------------------------------------
 st.set_page_config(
-    page_title="일별 박스오피스",
-    page_icon="🎬",
+    page_title="기온 예측기",
+    page_icon="🌡️",
     layout="wide"
 )
 
-# =========================
-# 전체 디자인
-# =========================
-st.markdown("""
-<style>
-.stApp {
-    background:
-        radial-gradient(circle at 50% 0%, #245d91 0%, #102f50 30%,
-        #071b31 65%, #020914 100%);
-    color: white;
-}
+st.title("🌡️ 서울 기온 예측기")
+st.write("서울의 과거 연평균기온을 바탕으로 선형회귀를 이용해 예상 기온을 확인합니다.")
 
-h1 {
-    color: #6edcff !important;
-    font-weight: 900;
-}
-
-h2, h3 {
-    color: #ffffff !important;
-    font-weight: 800;
-}
-
-.stCaption {
-    color: #a9d8f5 !important;
-}
-
-/* 날짜 선택 */
-[data-testid="stDateInput"] {
-    background: rgba(12, 42, 70, 0.9);
-    border: 1px solid #3289c7;
-    border-radius: 12px;
-}
-
-/* TOP 3 */
-.top3-container {
-    display: flex;
-    gap: 15px;
-    margin: 8px 0 20px 0;
-}
-
-.top3-card {
-    flex: 1;
-    min-height: 120px;
-    padding: 16px;
-    border-radius: 18px;
-    background: linear-gradient(
-        145deg,
-        rgba(22, 82, 126, 0.95),
-        rgba(6, 25, 45, 0.98)
-    );
-    box-shadow: 0 8px 25px rgba(0,0,0,0.45);
-}
-
-.top3-card.first {
-    border: 2px solid #ffd84d;
-    background: linear-gradient(
-        145deg,
-        #385c82,
-        #102b48
-    );
-    box-shadow: 0 0 25px rgba(255,216,77,0.25);
-}
-
-.top3-card.second {
-    border: 2px solid #bde8ff;
-    background: linear-gradient(
-        145deg,
-        #236b91,
-        #102b48
-    );
-}
-
-.top3-card.third {
-    border: 2px solid #ffb36b;
-    background: linear-gradient(
-        145deg,
-        #315f83,
-        #172b45
-    );
-}
-
-.top3-rank {
-    font-size: 27px;
-    font-weight: 900;
-    margin-bottom: 7px;
-}
-
-.top3-title {
-    font-size: 18px;
-    font-weight: 900;
-    color: white;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.top3-info {
-    color: #b9e5ff;
-    font-size: 12px;
-    margin-top: 9px;
-}
-
-/* 영화 테이블 */
-.movie-table-box {
-    background: linear-gradient(
-        145deg,
-        rgba(11, 43, 70, 0.98),
-        rgba(3, 15, 29, 0.98)
-    );
-    border: 1px solid #286d9e;
-    border-radius: 17px;
-    overflow: hidden;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.55);
-}
-
-.movie-table {
-    width: 100%;
-    border-collapse: collapse;
-    color: #eaf8ff;
-    font-size: 13px;
-}
-
-.movie-table thead {
-    background: linear-gradient(
-        90deg,
-        #0d4c75,
-        #1689c4,
-        #0d4c75
-    );
-}
-
-.movie-table th {
-    color: white;
-    font-weight: 900;
-    padding: 12px 8px;
-    text-align: center;
-}
-
-.movie-table td {
-    padding: 9px 8px;
-    text-align: center;
-    border-bottom: 1px solid rgba(70,160,210,0.2);
-}
-
-.movie-table tbody tr:nth-child(odd) {
-    background: rgba(21, 74, 110, 0.25);
-}
-
-.movie-table tbody tr:nth-child(even) {
-    background: rgba(4, 30, 52, 0.4);
-}
-
-.movie-table tbody tr:hover {
-    background: rgba(54, 184, 255, 0.18);
-}
-
-.movie-name {
-    text-align: left !important;
-    font-weight: 700;
-    color: #f1fbff;
-}
-
-/* 순위 */
-.rank-normal {
-    font-weight: 900;
-    color: #6edcff;
-}
-
-.rank-1 {
-    font-size: 22px;
-    color: #ffd84d;
-}
-
-.rank-2 {
-    font-size: 20px;
-    color: #d5efff;
-}
-
-.rank-3 {
-    font-size: 19px;
-    color: #ffb36b;
-}
-
-/* 순위 변동 */
-.up {
-    color: #ff657a;
-    font-size: 19px;
-    font-weight: 900;
-}
-
-.down {
-    color: #55bfff;
-    font-size: 19px;
-    font-weight: 900;
-}
-
-.same {
-    color: #829caf;
-    font-size: 18px;
-}
-
-/* 그래프 제목 */
-.chart-title {
-    color: #ffffff;
-    font-size: 17px;
-    font-weight: 900;
-    border-left: 5px solid #4fd4ff;
-    padding-left: 10px;
-    margin-bottom: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-
-# =========================
-# API
-# =========================
-API_KEY = st.secrets["KOBIS_KEY"]
-
-URL = (
-    "https://www.kobis.or.kr/kobisopenapi/webservice/rest/"
-    "boxoffice/searchDailyBoxOfficeList.json"
+# --------------------------------------------------
+# 데이터 불러오기
+# --------------------------------------------------
+DATA_URL = (
+    "https://raw.githubusercontent.com/greatsong/modudata/"
+    "bb860932644270ad1199f10d3e7670e30231bce4/data/seoul.csv"
 )
 
-KST = datetime.timezone(datetime.timedelta(hours=9))
+@st.cache_data
+def load_data():
+    df = pd.read_csv(DATA_URL, encoding="utf-8-sig")
 
-yesterday = (
-    datetime.datetime.now(KST).date()
-    - datetime.timedelta(days=1)
-)
+    # 날짜 변환
+    df["날짜"] = pd.to_datetime(df["날짜"], errors="coerce")
 
-selected_date = st.date_input(
-    "📅 조회할 날짜",
-    value=yesterday,
-    max_value=yesterday
-)
+    # 평균기온 숫자 변환
+    df["평균기온"] = pd.to_numeric(df["평균기온"], errors="coerce")
 
-target_dt = selected_date.strftime("%Y%m%d")
+    # 필요한 데이터만 사용
+    df = df.dropna(subset=["날짜", "평균기온"])
+
+    # 연도 생성
+    df["연도"] = df["날짜"].dt.year
+
+    return df
 
 
-@st.cache_data(ttl=3600)
-def fetch_boxoffice(date_str):
-    params = {
-        "key": API_KEY,
-        "targetDt": date_str,
-        "itemPerPage": 10
-    }
+df = load_data()
 
-    response = requests.get(
-        URL,
-        params=params,
-        timeout=10
+# --------------------------------------------------
+# 2025년 이후 데이터 제외
+# --------------------------------------------------
+df = df[df["연도"] <= 2025].copy()
+
+# --------------------------------------------------
+# 연도별 관측일 수와 평균기온 계산
+# --------------------------------------------------
+yearly = (
+    df.groupby("연도")
+    .agg(
+        평균기온=("평균기온", "mean"),
+        관측일수=("평균기온", "count")
     )
-
-    response.raise_for_status()
-    return response.json()
-
-
-# =========================
-# 제목
-# =========================
-st.title("🎬 일별 박스오피스")
-st.caption(f"조회 날짜: {selected_date} · 한국 시간 기준")
-
-
-# =========================
-# 데이터 가져오기
-# =========================
-try:
-    data = fetch_boxoffice(target_dt)
-
-except requests.RequestException:
-    st.error(
-        "서버에 연결하지 못했습니다. "
-        "인터넷 연결을 확인하고 잠시 뒤 새로고침해 주세요."
-    )
-    st.stop()
-
-
-if "faultInfo" in data:
-    st.error(
-        f"API 오류: "
-        f"{data['faultInfo'].get('message', '')}"
-    )
-    st.info("secrets의 KOBIS_KEY 값을 확인해 주세요.")
-    st.stop()
-
-
-movies = (
-    data
-    .get("boxOfficeResult", {})
-    .get("dailyBoxOfficeList", [])
+    .reset_index()
 )
 
+# 관측일이 300일 이상인 해만 사용
+yearly = yearly[yearly["관측일수"] >= 300].copy()
 
-if not movies:
-    st.warning("그날은 아직 집계 전입니다")
-    st.stop()
+# 회귀에 사용할 시작 연도
+REGRESSION_START_YEAR = 1908
 
+# 1908년 이전 자료는 회귀에서 제외
+yearly = yearly[yearly["연도"] >= REGRESSION_START_YEAR].copy()
 
-# =========================
-# 데이터 정리
-# =========================
-df = pd.DataFrame(movies)
+# --------------------------------------------------
+# 독립변수: 1908년부터 지난 연수
+# --------------------------------------------------
+yearly["지난연수"] = yearly["연도"] - REGRESSION_START_YEAR
 
-for col in [
-    "rank",
-    "rankInten",
-    "audiCnt",
-    "audiAcc",
-    "scrnCnt"
-]:
-    df[col] = pd.to_numeric(
-        df[col],
-        errors="coerce"
-    )
+# --------------------------------------------------
+# 선형회귀 계산
+# y = a*x + b
+# --------------------------------------------------
+x = yearly["지난연수"].to_numpy()
+y = yearly["평균기온"].to_numpy()
 
-df = (
-    df
-    .sort_values("rank")
-    .reset_index(drop=True)
+slope, intercept = np.polyfit(x, y, 1)
+
+# 예측값
+yearly["회귀예측기온"] = slope * yearly["지난연수"] + intercept
+
+# 상관계수
+correlation = np.corrcoef(x, y)[0, 1]
+
+# --------------------------------------------------
+# 회귀선 표시용 데이터
+# 1908년부터 2100년까지
+# --------------------------------------------------
+future_years = np.arange(REGRESSION_START_YEAR, 2101)
+future_elapsed = future_years - REGRESSION_START_YEAR
+future_prediction = slope * future_elapsed + intercept
+
+# --------------------------------------------------
+# 슬라이더
+# --------------------------------------------------
+selected_year = st.slider(
+    "📅 예상 기온을 확인할 연도를 선택하세요",
+    min_value=1900,
+    max_value=2100,
+    value=2025,
+    step=1
 )
 
+# 선택 연도의 예상 기온
+selected_elapsed = selected_year - REGRESSION_START_YEAR
+predicted_temperature = slope * selected_elapsed + intercept
 
-def make_movie_name(row):
-    if row["rank"] <= 5:
-        return "🏆 " + row["movieNm"]
-    return row["movieNm"]
+# --------------------------------------------------
+# 선택한 연도 예상 기온
+# --------------------------------------------------
+st.subheader(f"🌡️ {selected_year}년 예상 연평균기온")
 
-
-df["display_movieNm"] = df.apply(
-    make_movie_name,
-    axis=1
+st.metric(
+    label="회귀모델 예상 기온",
+    value=f"{predicted_temperature:.2f} °C"
 )
 
+# --------------------------------------------------
+# 회귀 정보
+# --------------------------------------------------
+col1, col2, col3, col4 = st.columns(4)
 
-# =========================
-# TOP 3
-# =========================
-st.subheader("🏆 오늘의 TOP 3")
+with col1:
+    st.metric("회귀에 사용된 연도 수", f"{len(yearly)}년")
 
-top3 = df.head(3)
+with col2:
+    st.metric("시작 연도", f"{yearly['연도'].min()}년")
 
-medals = ["🥇", "🥈", "🥉"]
-classes = ["first", "second", "third"]
+with col3:
+    st.metric("끝 연도", f"{yearly['연도'].max()}년")
 
-top3_parts = [
-    '<div class="top3-container">'
-]
+with col4:
+    st.metric("상관계수", f"{correlation:.3f}")
 
-for i, (_, row) in enumerate(top3.iterrows()):
-    top3_parts.append(
-        f'<div class="top3-card {classes[i]}">'
-        f'<div class="top3-rank">'
-        f'{medals[i]} {int(row["rank"])}위'
-        f'</div>'
-        f'<div class="top3-title">'
-        f'{row["movieNm"]}'
-        f'</div>'
-        f'<div class="top3-info">'
-        f'오늘 관객 {int(row["audiCnt"]):,}명'
-        f'　·　'
-        f'누적 {int(row["audiAcc"]):,}명'
-        f'</div>'
-        f'</div>'
-    )
+# --------------------------------------------------
+# 산점도 + 회귀선
+# --------------------------------------------------
+fig = go.Figure()
 
-top3_parts.append("</div>")
-
-st.markdown(
-    "".join(top3_parts),
-    unsafe_allow_html=True
-)
-
-
-# =========================
-# 1위 정보
-# =========================
-top = df.iloc[0]
-
-st.subheader(
-    f"🥇 1위 — {top['movieNm']}"
-)
-
-c1, c2, c3 = st.columns(3)
-
-c1.metric(
-    "🎟️ 오늘 관객수",
-    f"{int(top['audiCnt']):,}명"
-)
-
-c2.metric(
-    "🍿 누적 관객수",
-    f"{int(top['audiAcc']):,}명"
-)
-
-c3.metric(
-    "🎞️ 스크린수",
-    f"{int(top['scrnCnt']):,}개"
-)
-
-
-# =========================
-# TOP 10 테이블
-# =========================
-st.subheader("📋 박스오피스 TOP 10")
-
-table = df.head(10).copy()
-
-
-def make_arrow(value):
-    if pd.isna(value):
-        return "-"
-
-    if value > 0:
-        return "↑"
-
-    if value < 0:
-        return "↓"
-
-    return "-"
-
-
-html_parts = [
-    '<div class="movie-table-box">',
-    '<table class="movie-table">',
-    '<thead>',
-    '<tr>',
-    '<th>순위</th>',
-    '<th>영화명</th>',
-    '<th>개봉일</th>',
-    '<th>관객수</th>',
-    '<th>누적관객</th>',
-    '<th>스크린수</th>',
-    '<th>순위변동</th>',
-    '</tr>',
-    '</thead>',
-    '<tbody>'
-]
-
-
-for _, row in table.iterrows():
-
-    rank = int(row["rank"])
-    change = make_arrow(row["rankInten"])
-
-    if rank == 1:
-        rank_html = '<span class="rank-1">🥇</span>'
-
-    elif rank == 2:
-        rank_html = '<span class="rank-2">🥈</span>'
-
-    elif rank == 3:
-        rank_html = '<span class="rank-3">🥉</span>'
-
-    else:
-        rank_html = (
-            f'<span class="rank-normal">'
-            f'{rank}'
-            f'</span>'
-        )
-
-    if change == "↑":
-        change_html = '<span class="up">↑</span>'
-
-    elif change == "↓":
-        change_html = '<span class="down">↓</span>'
-
-    else:
-        change_html = '<span class="same">−</span>'
-
-    html_parts.append(
-        f'<tr>'
-        f'<td>{rank_html}</td>'
-        f'<td class="movie-name">'
-        f'{row["display_movieNm"]}'
-        f'</td>'
-        f'<td>{row["openDt"]}</td>'
-        f'<td>{int(row["audiCnt"]):,}</td>'
-        f'<td>{int(row["audiAcc"]):,}</td>'
-        f'<td>{int(row["scrnCnt"]):,}</td>'
-        f'<td>{change_html}</td>'
-        f'</tr>'
-    )
-
-
-html_parts.extend([
-    '</tbody>',
-    '</table>',
-    '</div>'
-])
-
-
-st.markdown(
-    "".join(html_parts),
-    unsafe_allow_html=True
-)
-
-
-# =========================
-# 그래프
-# =========================
-top10 = (
-    df
-    .sort_values(
-        "audiCnt",
-        ascending=False
-    )
-    .head(10)
-    .copy()
-)
-
-st.subheader("📊 관객수 TOP 10")
-
-g1, g2 = st.columns(2)
-
-
-# =========================
-# 그래프 1
-# =========================
-with g1:
-
-    st.markdown(
-        '<div class="chart-title">'
-        '🎞️ 영화별 관객수'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    fig1 = px.bar(
-        top10.sort_values("audiCnt"),
-        x="audiCnt",
-        y="movieNm",
-        orientation="h",
-        color="movieNm",
-        labels={
-            "audiCnt": "관객수",
-            "movieNm": "영화"
-        },
-        color_discrete_sequence=[
-            "#55d6ff",
-            "#45b8f2",
-            "#3c9fe0",
-            "#5686ff",
-            "#756cff",
-            "#9a67e8",
-            "#c36ee8",
-            "#e26fc0",
-            "#f2789b",
-            "#ff9b6b"
-        ]
-    )
-
-    fig1.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(3,18,34,0.75)",
-        font=dict(
-            color="white",
-            size=10
+# 실제 연평균기온 산점도
+fig.add_trace(
+    go.Scatter(
+        x=yearly["연도"],
+        y=yearly["평균기온"],
+        mode="markers",
+        name="실제 연평균기온",
+        marker=dict(
+            size=7,
+            opacity=0.75
         ),
-        height=330,
-        margin=dict(
-            l=10,
-            r=10,
-            t=10,
-            b=20
-        ),
-        showlegend=False,
-        xaxis=dict(
-            gridcolor="#24516d"
-        )
-    )
-
-    fig1.update_traces(
+        customdata=yearly["관측일수"],
         hovertemplate=(
-            "<b>%{y}</b><br>"
-            "관객수: %{x:,}명"
+            "<b>%{x}년</b><br>"
+            "평균기온: %{y:.2f} °C<br>"
+            "관측일수: %{customdata}일"
             "<extra></extra>"
         )
     )
+)
 
-    st.plotly_chart(
-        fig1,
-        width="stretch"
-    )
-
-
-# =========================
-# 그래프 2
-# =========================
-with g2:
-
-    st.markdown(
-        '<div class="chart-title">'
-        '🍿 TOP 10 관객 점유율'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    fig2 = px.pie(
-        top10,
-        names="movieNm",
-        values="audiCnt",
-        hole=0.55,
-        color="movieNm",
-        color_discrete_sequence=[
-            "#55d6ff",
-            "#45b8f2",
-            "#3c9fe0",
-            "#5686ff",
-            "#756cff",
-            "#9a67e8",
-            "#c36ee8",
-            "#e26fc0",
-            "#f2789b",
-            "#ff9b6b"
-        ]
-    )
-
-    fig2.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(3,18,34,0.75)",
-        font=dict(
-            color="white",
-            size=9
+# 회귀선
+fig.add_trace(
+    go.Scatter(
+        x=future_years,
+        y=future_prediction,
+        mode="lines",
+        name="회귀 직선",
+        line=dict(
+            width=3
         ),
-        height=330,
-        margin=dict(
-            l=5,
-            r=5,
-            t=10,
-            b=10
-        ),
-        legend=dict(
-            bgcolor="rgba(0,0,0,0)",
-            font=dict(
-                color="white",
-                size=9
-            )
+        hovertemplate=(
+            "<b>%{x}년</b><br>"
+            "회귀 예상기온: %{y:.2f} °C"
+            "<extra></extra>"
         )
     )
+)
 
-    fig2.update_traces(
-        textposition="inside",
-        textinfo="percent"
+# 선택한 연도 표시
+fig.add_trace(
+    go.Scatter(
+        x=[selected_year],
+        y=[predicted_temperature],
+        mode="markers",
+        name=f"{selected_year}년 예상값",
+        marker=dict(
+            size=14,
+            symbol="star"
+        ),
+        hovertemplate=(
+            f"<b>{selected_year}년</b><br>"
+            "예상기온: %{y:.2f} °C"
+            "<extra></extra>"
+        )
     )
+)
 
-    st.plotly_chart(
-        fig2,
-        width="stretch"
+fig.update_layout(
+    title="서울 연평균기온과 선형회귀",
+    xaxis_title="연도",
+    yaxis_title="연평균기온 (°C)",
+    xaxis=dict(
+        tickmode="linear",
+        dtick=10,
+        range=[1900, 2100]
+    ),
+    hovermode="closest",
+    height=600,
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="left",
+        x=0
     )
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# --------------------------------------------------
+# 회귀식 및 데이터 조건
+# --------------------------------------------------
+st.subheader("📊 회귀 분석 정보")
+
+st.write(
+    f"**회귀식:** 연평균기온 = "
+    f"{slope:.4f} × (연도 - 1908) + {intercept:.4f}"
+)
+
+st.write(
+    f"**상관계수:** {correlation:.4f}"
+)
+
+st.write(
+    "※ 2025년 이후의 데이터와 연간 관측일수가 300일 미만인 연도는 "
+    "회귀 분석에서 제외했습니다."
+)
+
+st.write(
+    f"※ 최종적으로 **{len(yearly)}개 연도**의 데이터를 이용했으며, "
+    f"**{yearly['연도'].min()}년~{yearly['연도'].max()}년**의 자료로 "
+    "회귀 직선을 계산했습니다."
+)
