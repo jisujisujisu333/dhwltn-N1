@@ -55,3 +55,12 @@ st.plotly_chart(fig, use_container_width=True)
 낮음 = int((표시["예측"] < 바닥).sum())
 if 낮음:
     st.caption(f"예측이 1,000명보다 작게 나온 영화 {낮음}편은 그래프 바닥에 표시했습니다. 회귀는 음수도 예측합니다.")
+# 기본 변수와 첫 주 관객 수 추가 비교
+st.subheader("기본 변수만 vs 첫 주 관객 추가")
+결과 = []
+for 이름, 변수 in [("기본 변수만", list(기본.values())),
+                ("첫 주 관객 추가", list(기본.values()) + list(추가.values()))]:
+    m = LinearRegression().fit(train[변수], train["total_audi"])
+    결과.append({"쓴 변수": 이름, "R²": round(r2_score(test["total_audi"], m.predict(test[변수])), 3)})
+st.dataframe(pd.DataFrame(결과), hide_index=True)
+st.caption("사후 집계값을 사용한 교육용 비교입니다. 실제 개봉 전 예측 성능을 뜻하지 않습니다.")
