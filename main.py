@@ -1,137 +1,386 @@
-# main.py — 영화 유형 나누기: 속성을 골라 묶고, 묶음 수도 바꿔 가며 정한다
-import streamlit as st
-import numpy as np
+import re
+from itertools import combinations
+
 import pandas as pd
 import plotly.express as px
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-
-st.set_page_config(page_title="영화 유형 나누기", page_icon="🎬", layout="wide")
-st.title("🎬 영화 유형 나누기")
-st.caption("정답 열 없이, 내가 고른 속성이 비슷한 영화끼리 묶습니다.")
-
-MOVIES = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
-기호 = ["㉮", "㉯", "㉰", "㉱", "㉲", "㉳", "㉴"]          # 묶음 번호 대신 사용하는 표시
-속성 = ["스크린 수(로그)", "누적 관객(로그)", "10위권 일수", "롱런 지수"]
-원래단위 = ["스크린 수", "누적 관객", "10위권 일수", "롱런 지수"]
+import streamlit as st
 
 
+# --------------------------------------------------
+# 기본 설정
+# --------------------------------------------------
+st.set_page_config(
+    page_title="급식 규칙 찾기",
+    page_icon="🍱",
+    layout="wide",
+)
+
+DATA_URL = (
+    "https://raw.githubusercontent.com/teacher188-netizen/"
+    "2026-datascience/refs/heads/main/sangok_meals.csv"
+)
+
+st.title("🍱 급식 규칙 찾기")
+st.caption(
+    "우리 학교 중식 데이터로 메뉴 사이의 연관 규칙을 찾아봅니다."
+)
+
+
+# --------------------------------------------------
+# 데이터 읽기
+# --------------------------------------------------
 @st.cache_data
-def load_data():
-    df = pd.read_csv(MOVIES, dtype={"movieCd": str})
-    df = df.sort_values("movieCd").reset_index(drop=True)
-    전체편수 = len(df)
-    # 네 속성을 만들 수 없는 영화는 뺀다: 값이 없거나 첫 주 관객이 0인 행
-    쓸열 = ["first_scrn", "total_audi", "days_in_top10", "first_week_audi"]
-    df = df.dropna(subset=쓸열 + ["movieNm"])
-    df = df[(df["first_scrn"] > 0) & (df["total_audi"] > 0) & (df["first_week_audi"] > 0)]
-    df = df.reset_index(drop=True)
-    return df, 전체편수
+def load_data(url):
+    df = pd.read_csv(url, encoding="utf-8")
+
+    # 열 이름의 앞뒤 공백 제거
+    df.columns = df.columns.astype(str).str.strip()
+
+    # 열 이름은 대소문자 및 공백 차이를 허용
+    column_map = {
+        re.sub(r"\s+", "", str(col)).lower(): col
+        for col in df.columns
+    }
+
+    required = ["날짜", "식사", "메뉴"]
+    missing = [
+        col for col in required
+        if re.sub(r"\s+", "", col).lower() not in column_map
+    ]
+
+    if missing:
+        raise ValueError(
+            f"필수 열을 찾을 수 없습니다: {', '.join(missing)}"
+        )
+
+    df = df.rename(
+        columns={
+            column_map["날짜"]: "날짜",
+            column_map["식사"]: "식사",
+            column_map["메뉴"]: "메뉴",
+        }
+    )
+
+    df = df[["날짜", "식사", "메뉴"]].copy()
+    df["식사"] = df["식사"].astype("string").str.strip()
+    df["메뉴"] = df["메뉴"].fillna("").astype(str)
+    df["날짜"] = df["날짜"].astype("string").str.strip()
+
+    # 중식만 선택: '중식'이라는 값이 포함된 경우
+    lunch = df[
+        df["식사"].str.contains("중식", na=False)
+    ].copy()
+
+    # 괄호와 괄호 안의 내용 제거
+    # 예: 사과(친환경) -> 사과
+    # 일반 괄호와 대괄호 형태를 모두 처리
+    def clean_menu(name):
+        name = str(name).strip()
+
+        previous = None
+        while previous != name:
+            previous = name
+            name = re.sub(r"\([^()]*\)", "", name)
+            name = re.sub(r"\[[^\[\]]*\]", "", name)
+            name = re.sub(r"（[^（）]*）", "", name)
+            name = re.sub(r"【[^【】]*】", "", name)
+
+        return re.sub(r"\s+", " ", name).strip()
+
+    def split_menus(value):
+        result = []
+        seen = set()
+
+        for raw in value.split("|"):
+            menu = clean_menu(raw)
+
+            # 빈 메뉴 및 동일 식단 내 중복 메뉴 제외
+            if menu and menu not in seen:
+                result.append(menu)
+                seen.add(menu)
+
+        return result
+
+    lunch["메뉴목록"] = lunch["메뉴"].map(split_menus)
+
+    # 메뉴가 하나도 없는 식단은 분석에서 제외
+    lunch = lunch[lunch["메뉴목록"].map(bool)].reset_index(drop=True)
+
+    return lunch
 
 
-df, 전체편수 = load_data()
+# --------------------------------------------------
+# 연관 규칙 계산
+# --------------------------------------------------
+@st.cache_data
+def make_rules(meal_lists):
+    n = len(meal_lists)
 
-# 네 가지 속성을 만든다. 숫자 차이가 너무 큰 둘은 상용로그를 취한다
-df["스크린 수"] = df["first_scrn"]
-df["누적 관객"] = df["total_audi"]
-df["10위권 일수"] = df["days_in_top10"]
-df["롱런 지수"] = (df["total_audi"] / df["first_week_audi"]).clip(upper=20)   # 20을 넘으면 20으로
-df["스크린 수(로그)"] = np.log10(df["first_scrn"])
-df["누적 관객(로그)"] = np.log10(df["total_audi"])
+    if n == 0:
+        return pd.DataFrame(
+            columns=[
+                "조건", "결과", "동시",
+                "지지도", "신뢰도", "향상도",
+            ]
+        ), {}, 0
 
-st.info(f"전체 {전체편수:,}편 가운데 네 속성을 모두 만들 수 있는 {len(df):,}편으로 묶었습니다.")
+    # 메뉴별 등장 일수
+    menu_counts = {}
+    # 순서가 없는 메뉴 쌍별 동시 등장 일수
+    pair_counts = {}
 
-고른속성 = st.multiselect("묶는 데 사용할 속성 (둘 이상)", 속성, default=속성)
-if len(고른속성) < 2:
-    st.warning("속성을 둘 이상 골라 주세요.")
+    for menus in meal_lists:
+        for menu in menus:
+            menu_counts[menu] = menu_counts.get(menu, 0) + 1
+
+        for a, b in combinations(sorted(set(menus)), 2):
+            pair_counts[(a, b)] = pair_counts.get((a, b), 0) + 1
+
+    rules = []
+
+    for (a, b), count in pair_counts.items():
+        support = count / n
+        support_a = menu_counts[a] / n
+        support_b = menu_counts[b] / n
+
+        # A -> B
+        rules.append({
+            "조건": a,
+            "결과": b,
+            "동시": count,
+            "지지도": support,
+            "신뢰도": count / menu_counts[a],
+            "향상도": support / (support_a * support_b),
+        })
+
+        # B -> A: 역방향 규칙도 별도 계산
+        rules.append({
+            "조건": b,
+            "결과": a,
+            "동시": count,
+            "지지도": support,
+            "신뢰도": count / menu_counts[b],
+            "향상도": support / (support_a * support_b),
+        })
+
+    rules_df = pd.DataFrame(rules)
+
+    if not rules_df.empty:
+        rules_df = rules_df.sort_values(
+            ["향상도", "신뢰도", "동시"],
+            ascending=[False, False, False],
+        ).reset_index(drop=True)
+
+    return rules_df, menu_counts, len(pair_counts)
+
+
+# --------------------------------------------------
+# 앱 실행
+# --------------------------------------------------
+try:
+    with st.spinner("급식 데이터를 불러오는 중입니다..."):
+        meals = load_data(DATA_URL)
+
+except Exception as exc:
+    st.error(f"CSV를 읽거나 처리하지 못했습니다: {exc}")
+    st.info(
+        "인터넷 연결과 CSV 주소, 그리고 날짜·식사·메뉴 열을 확인해 주세요."
+    )
     st.stop()
 
-Xs = StandardScaler().fit_transform(df[고른속성])          # 고른 속성을 표준화한다
-k = st.slider("몇 묶음으로 나눌까요", 2, 7, 3)
+if meals.empty:
+    st.warning("분석할 중식 데이터가 없습니다.")
+    st.stop()
+
+meal_lists = meals["메뉴목록"].tolist()
+rules, menu_counts, pair_count = make_rules(meal_lists)
+
+if rules.empty:
+    st.warning(
+        "함께 나온 메뉴 쌍이 없습니다. "
+        "둘 이상의 메뉴가 포함된 식단이 있는지 확인해 주세요."
+    )
+    st.stop()
 
 
-def 나누기(개수):
-    """표준화한 값을 k-평균으로 나눈다. 난수를 고정해 다시 실행해도 결과가 같다."""
-    return KMeans(n_clusters=개수, n_init=10, random_state=42).fit(Xs)
+# --------------------------------------------------
+# 필터 및 정렬
+# --------------------------------------------------
+with st.sidebar:
+    st.header("🔎 규칙 찾기")
+
+    menu_options = ["전체 메뉴"] + sorted(menu_counts.keys())
+
+    selected_menu = st.selectbox(
+        "메뉴 선택",
+        menu_options,
+        help="선택한 메뉴가 조건 또는 결과에 포함된 규칙만 표시합니다.",
+    )
+
+    sort_option = st.selectbox(
+        "정렬 기준",
+        ["향상도 순", "신뢰도 순", "동시 순"],
+    )
+
+    min_count = st.number_input(
+        "최소 동시 등장 일수",
+        min_value=1,
+        max_value=len(meals),
+        value=1,
+        step=1,
+    )
+
+    st.caption(
+        "동시 등장 일수는 선택한 조건과 결과 메뉴가 "
+        "함께 나온 급식 일수입니다."
+    )
 
 
-모델 = 나누기(k)
-번호 = 모델.labels_
+# --------------------------------------------------
+# 통계
+# --------------------------------------------------
+filtered = rules[rules["동시"] >= min_count].copy()
 
-# 누적 관객 평균이 큰 묶음부터 ㉮·㉯·㉰ 순으로 표시한다
-순서 = pd.Series(df["누적 관객"].to_numpy()).groupby(번호).mean().sort_values(ascending=False).index
-자리 = {g: i for i, g in enumerate(순서)}
-df["묶음"] = [기호[자리[g]] for g in 번호]
+if selected_menu != "전체 메뉴":
+    filtered = filtered[
+        (filtered["조건"] == selected_menu)
+        | (filtered["결과"] == selected_menu)
+    ].copy()
 
-st.subheader("묶음 지도 · 2차원")
-c1, c2 = st.columns(2)
-x축 = c1.selectbox("가로축", 고른속성, index=0)
-y축 = c2.selectbox("세로축", 고른속성, index=min(1, len(고른속성) - 1))
-fig = px.scatter(df, x=x축, y=y축, color="묶음", hover_name="movieNm",
-                 category_orders={"묶음": 기호[:k]})
-fig.update_traces(marker=dict(size=9, opacity=0.8))
-fig.update_layout(height=460)
-st.plotly_chart(fig, width="stretch")
-st.caption("점 하나가 영화 한 편입니다. 축을 바꿔 보면 묶음이 나뉘는 축과 섞이는 축이 보입니다.")
+sort_columns = {
+    "향상도 순": ["향상도", "신뢰도", "동시"],
+    "신뢰도 순": ["신뢰도", "향상도", "동시"],
+    "동시 순": ["동시", "향상도", "신뢰도"],
+}
 
-st.subheader("묶음 지도 · 3차원")
-if len(고른속성) < 3:
-    st.info("속성을 셋 이상 고르면 3차원 그림이 표시됩니다.")
-else:
-    d1, d2, d3 = st.columns(3)
-    x3 = d1.selectbox("x축", 고른속성, index=0, key="x3")
-    y3 = d2.selectbox("y축", 고른속성, index=1, key="y3")
-    z3 = d3.selectbox("z축", 고른속성, index=2, key="z3")
-    fig3 = px.scatter_3d(df, x=x3, y=y3, z=z3, color="묶음", hover_name="movieNm",
-                         category_orders={"묶음": 기호[:k]})
-    fig3.update_traces(marker=dict(size=2, opacity=0.7))
-    fig3.update_layout(height=560, legend=dict(orientation="h"))
-    st.plotly_chart(fig3, width="stretch")
-    st.caption("마우스로 끌면 돌아갑니다. 점에 마우스를 올리면 제목이 보입니다.")
+filtered = filtered.sort_values(
+    sort_columns[sort_option],
+    ascending=[False, False, False],
+).reset_index(drop=True)
 
-st.subheader("묶음별 편수와 네 속성의 평균")
-요약 = df.groupby("묶음")[원래단위].mean().round(2)
-요약.insert(0, "편수", df.groupby("묶음").size())
-요약 = 요약.reindex(기호[:k])
-st.dataframe(요약, width="stretch", column_config={
-    "편수": st.column_config.NumberColumn("편수", format="%,d편"),
-    "스크린 수": st.column_config.NumberColumn("스크린 수", format="%.1f개"),
-    "누적 관객": st.column_config.NumberColumn("누적 관객", format="%,.0f명"),
-    "10위권 일수": st.column_config.NumberColumn("10위권 일수", format="%.1f일"),
-    "롱런 지수": st.column_config.NumberColumn("롱런 지수", format="%.2f배"),
-})
-st.caption("평균은 로그를 취하기 전의 원래 단위입니다. 롱런 지수는 누적 관객을 첫 주 관객으로 나눈 값이고 20에서 잘랐습니다.")
+m1, m2, m3 = st.columns(3)
 
-st.subheader("묶음마다 관객이 많은 다섯 편")
-열 = st.columns(k)
-for i, 이름 in enumerate(기호[:k]):
-    묶음 = df[df["묶음"] == 이름].sort_values("누적 관객", ascending=False).head(5)
-    열[i].markdown(f"**{이름} 묶음 ({len(df[df['묶음'] == 이름]):,}편)**")
-    열[i].dataframe(pd.DataFrame({"영화": 묶음["movieNm"].to_numpy(),
-                                "누적 관객": 묶음["누적 관객"].to_numpy()}),
-                   width="stretch", hide_index=True,
-                   column_config={"누적 관객": st.column_config.NumberColumn("누적 관객", format="%,d명")})
+m1.metric("급식 일수", f"{len(meals):,}일")
+m2.metric("메뉴 종류 수", f"{len(menu_counts):,}종")
+m3.metric("함께 나온 메뉴 쌍 수", f"{pair_count:,}쌍")
 
-# 여기부터 ③ — 묶음 수를 몇으로 할지 정하는 화면
 st.divider()
-st.subheader("묶음 수는 몇이 좋을까")
 
-# 고른 속성으로 다시 계산한다. 묶음 안에서 점들이 중심에서 떨어진 거리의 제곱을 모두 더한 값(k=1~7)
-합 = pd.DataFrame({"묶음 수": list(range(1, 8)),
-                   "거리 제곱의 합": [round(float(나누기(개수).inertia_), 1) for 개수 in range(1, 8)]})
-# 바로 앞 묶음 수에서 줄어든 크기. 맨 첫 줄은 비교할 앞 값이 없다
-합["앞보다 줄어든 값"] = ["—" if pd.isna(v) else f"{v:,.1f}" for v in -합["거리 제곱의 합"].diff()]
 
-꺾은선 = px.line(합, x="묶음 수", y="거리 제곱의 합", markers=True)
-꺾은선.add_vline(x=k, line_dash="dash", annotation_text=f"지금 고른 묶음 수 {k}")
-꺾은선.update_layout(height=380, xaxis_title="묶음 수(k)", yaxis_title="묶음 안 거리 제곱의 합")
-st.plotly_chart(꺾은선, width="stretch")
-st.caption("묶음 수를 늘리면 값은 반드시 줄어듭니다. 줄어드는 폭이 크게 꺾이는 자리를 찾습니다.")
+# --------------------------------------------------
+# 규칙 표
+# --------------------------------------------------
+st.subheader("📋 메뉴 연관 규칙")
 
-st.dataframe(합, width="stretch", hide_index=True)
+st.caption(
+    f"표시 중인 방향성 규칙: {len(filtered):,}개 · "
+    f"정렬: {sort_option}"
+)
 
-점수 = silhouette_score(Xs, 번호)
-st.metric(f"묶음 {k}개일 때의 실루엣 점수", f"{점수:.3f}")
-st.caption("실루엣 점수는 -1에서 1 사이이고, 1에 가까울수록 묶음이 뚜렷하다는 뜻입니다. "
-           "점수가 가장 높은 묶음 수와 사람이 이해하기 좋은 묶음 수가 늘 같지는 않습니다.")
+if filtered.empty:
+    st.info("선택한 조건에 해당하는 규칙이 없습니다.")
+else:
+    display_df = filtered[
+        ["조건", "결과", "동시", "지지도", "신뢰도", "향상도"]
+    ].copy()
+
+    # 보기 편하도록 비율 지표는 소수점 4자리로 표시
+    display_df["지지도"] = display_df["지지도"].map(
+        lambda x: f"{x:.4f}"
+    )
+    display_df["신뢰도"] = display_df["신뢰도"].map(
+        lambda x: f"{x:.4f}"
+    )
+    display_df["향상도"] = display_df["향상도"].map(
+        lambda x: f"{x:.4f}"
+    )
+
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        height=420,
+    )
+
+    st.download_button(
+        "📥 현재 규칙 CSV 다운로드",
+        data=filtered.to_csv(index=False).encode("utf-8-sig"),
+        file_name="급식_연관규칙.csv",
+        mime="text/csv",
+    )
+
+
+# --------------------------------------------------
+# 향상도 상위 10개 그래프
+# --------------------------------------------------
+st.divider()
+st.subheader("📊 향상도 상위 10개 규칙")
+
+st.caption(
+    "현재 메뉴 필터와 최소 동시 등장 일수를 적용한 결과에서 "
+    "향상도가 높은 규칙을 표시합니다."
+)
+
+top10 = filtered.sort_values(
+    ["향상도", "신뢰도", "동시"],
+    ascending=[False, False, False],
+).head(10).copy()
+
+if top10.empty:
+    st.info("그래프로 표시할 규칙이 없습니다.")
+else:
+    # 조건 -> 결과 방향을 그래프에 명확히 표시
+    top10["규칙"] = top10.apply(
+        lambda row: f"{row['조건']} → {row['결과']}",
+        axis=1,
+    )
+
+    # 가로 막대그래프는 위에서 1위가 보이도록 역순으로 정렬
+    top10 = top10.sort_values(
+        ["향상도", "신뢰도", "동시"],
+        ascending=[True, True, True],
+    )
+
+    fig = px.bar(
+        top10,
+        x="향상도",
+        y="규칙",
+        orientation="h",
+        text="향상도",
+        hover_data={
+            "동시": True,
+            "지지도": ":.4f",
+            "신뢰도": ":.4f",
+            "향상도": ":.4f",
+            "규칙": False,
+        },
+        labels={
+            "향상도": "향상도 (Lift)",
+            "규칙": "연관 규칙",
+            "동시": "동시 등장 일수",
+            "지지도": "지지도",
+            "신뢰도": "신뢰도",
+        },
+        title="향상도 상위 10개",
+    )
+
+    fig.update_traces(
+        texttemplate="%{x:.3f}",
+        textposition="outside",
+        cliponaxis=False,
+    )
+
+    fig.update_layout(
+        height=max(350, 45 * len(top10) + 100),
+        yaxis_title="",
+        xaxis_title="향상도",
+        margin=dict(l=10, r=50, t=60, b=30),
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+st.caption(
+    "해석 팁: 향상도 1은 두 메뉴의 독립적인 등장과 같은 수준, "
+    "1 초과는 양의 연관성, 1 미만은 음의 연관성을 뜻합니다. "
+    "연관성은 인과관계를 의미하지 않습니다."
+)
