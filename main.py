@@ -1,77 +1,66 @@
-# main.py — 급식 규칙 찾기: 같은 날 함께 나온 메뉴 쌍을 센다
-import re
-from collections import Counter
-from itertools import combinations
-
+# main.py — 뇌졸중 예측 실습실: 이 데이터가 무엇인지 소개하는 첫 화면
 import pandas as pd
-import plotly.express as px
 import streamlit as st
 
-URL = "https://raw.githubusercontent.com/teacher188-netizen/2026-datascience/refs/heads/main/sangok_meals.csv"
+st.set_page_config(page_title="뇌졸중 예측 실습실", page_icon="🩺", layout="wide")
+st.title("🩺 뇌졸중 예측 실습실")
+st.write("건강 기록 5,110명분을 읽어 옵니다. 왼쪽 메뉴에서 페이지를 넘기며 들여다보고, 모델을 만들고, 채점합니다.")
 
-st.title("🍚 급식 규칙 찾기")
-
-
-@st.cache_data(ttl=3600)
-def load_baskets(url):
-    table = pd.read_csv(url, encoding="utf-8")
-    baskets = []
-    for line in table["메뉴"]:
-        names = set()
-        for dish in str(line).split("|"):
-            name = re.sub(r"\([^)]*\)", "", dish).strip()   # 괄호와 그 안의 내용은 제외한다
-            if name:
-                names.add(name)
-        if names:
-            baskets.append(sorted(names))
-    return baskets
+데이터주소 = "https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv"
 
 
-baskets = load_baskets(URL)
-n = len(baskets)
-single = Counter(item for basket in baskets for item in basket)           # 메뉴가 나온 날 수
-pair = Counter(c for basket in baskets for c in combinations(basket, 2))  # 두 메뉴가 함께 나온 날 수
+@st.cache_data
+def 데이터_읽기():
+    """UTF-8로 저장된 csv를 읽는다. bmi 열의 빈 값은 그대로 빈 값으로 남는다."""
+    return pd.read_csv(데이터주소, encoding="utf-8")
 
-rows = []
-for (a, b), together in pair.items():
-    for x, y in [(a, b), (b, a)]:              # 한 쌍에서 두 방향의 규칙이 나온다
-        rows.append({"조건": x, "결과": y, "동시": together,
-                     "지지도": round(together / n, 3),
-                     "신뢰도": round(together / single[x], 3),
-                     "향상도": round((together / single[x]) / (single[y] / n), 2)})
-규칙 = pd.DataFrame(rows, columns=["조건", "결과", "동시", "지지도", "신뢰도", "향상도"])
 
-st.caption(f"급식 {n}일 · 메뉴 {len(single)}종 · 함께 나온 적이 있는 메뉴 쌍 {len(pair):,}개 · "
-           f"규칙 {len(규칙):,}개")
+df = 데이터_읽기()
 
-기준 = st.radio("정렬", ["향상도 순", "신뢰도 순", "동시 순"], horizontal=True)
-메뉴 = st.selectbox("메뉴로 좁혀 보기", ["(전체)"] + sorted(single))
-최소동시 = st.slider("최소 동시 일수", 1, 10, 1)
-걸러낸규칙 = 규칙[규칙["동시"] >= 최소동시]
-st.write(f"동시에 나온 날이 {최소동시}일 이상인 규칙은 {len(걸러낸규칙):,}개입니다.")
+st.subheader("한눈에 보기")
+칸1, 칸2, 칸3, 칸4 = st.columns(4)
+칸1.metric("전체 사람 수", f"{len(df):,}명")
+칸2.metric("열 개수", f"{df.shape[1]}개")
+칸3.metric("뇌졸중을 겪은 사람", f"{int(df['stroke'].sum()):,}명")
+칸4.metric("그 비율", f"{df['stroke'].mean() * 100:.2f}%")
 
-보기 = 걸러낸규칙 if 메뉴 == "(전체)" else 걸러낸규칙[(걸러낸규칙["조건"] == 메뉴) | (걸러낸규칙["결과"] == 메뉴)]
-보기 = 보기.sort_values({"향상도 순": "향상도", "신뢰도 순": "신뢰도", "동시 순": "동시"}[기준],
-                    ascending=False, ignore_index=True)
-if 보기.empty:
-    st.info("조건에 맞는 규칙이 없습니다. 최소 동시 일수를 낮춰 봅니다.")
-else:
-    st.dataframe(보기, width="stretch", hide_index=True)
-    top = 보기.sort_values("향상도", ascending=False).head(10).copy()
-    top["규칙"] = top["조건"] + " → " + top["결과"]
-    fig = px.bar(top, x="향상도", y="규칙", orientation="h", text="향상도")
-    fig.update_layout(yaxis={"categoryorder": "total ascending"}, height=420)
-    st.plotly_chart(fig, width="stretch")
+st.subheader("열마다 무엇이 들어 있는가")
+st.caption("우리말 뜻 칸은 비어 있습니다. 교재의 열 대응표를 보고 직접 채워 넣으세요. 적은 내용은 저장되지 않습니다.")
 
-st.subheader("함께 나온 적 없는 짝")
-고른메뉴 = st.selectbox("메뉴 고르기", sorted(single), key="없는짝")
-같이나온메뉴 = {y for (a, b) in pair for x, y in [(a, b), (b, a)] if x == 고른메뉴}
-없는짝 = [{"메뉴": 이름, "나온 날": 날수} for 이름, 날수 in single.items()
-        if 이름 != 고른메뉴 and 이름 not in 같이나온메뉴 and 날수 >= 10]   # 혼자서는 열흘 이상 나온 메뉴만
 
-st.write(f"{고른메뉴} · 나온 날 {single[고른메뉴]}일 · 함께 나온 적 없는 메뉴 {len(없는짝)}종")
-if not 없는짝:
-    st.info("열흘 이상 나오면서 한 번도 함께 나오지 않은 메뉴가 없습니다.")
-else:
-    표 = pd.DataFrame(없는짝).sort_values("나온 날", ascending=False)
-    st.dataframe(표, width="stretch", hide_index=True)
+def 값의_종류(열):
+    """숫자 열은 가장 작은 값과 가장 큰 값을, 글자 열은 값의 가짓수와 실제 값을 적는다."""
+    칸 = df[열].dropna()
+    if pd.api.types.is_numeric_dtype(칸) and 칸.nunique() > 2:
+        return f"숫자 {칸.min():g} ~ {칸.max():g}"
+    값들 = sorted(칸.unique().astype(str))
+    return f"{len(값들)}가지 · " + " · ".join(값들)
+
+
+열설명 = pd.DataFrame({
+    "열 이름": df.columns,
+    "우리말 뜻": [""] * df.shape[1],
+    "값의 종류": [값의_종류(열) for 열 in df.columns],
+    "빈 값 개수": [int(df[열].isna().sum()) for 열 in df.columns],
+})
+st.data_editor(
+    열설명,
+    width="stretch",
+    hide_index=True,
+    disabled=["열 이름", "값의 종류", "빈 값 개수"],   # 우리말 뜻 칸만 고쳐 쓸 수 있다
+    key="열설명표",
+)
+
+st.subheader("앞 다섯 줄 그대로 보기")
+st.dataframe(df.head(5), width="stretch", hide_index=True)
+
+st.subheader("이 데이터는 어디서 왔는가")
+출처_기본값 = """출처: 캐글 Stroke Prediction Dataset (게시자 fedesoriano, 2021-01-26 공개)
+원본 주소: https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset
+라이선스: Data files © Original Authors
+게시자가 적은 문구: (Confidential Source) - Use only for educational purposes
+이 수업에서는 교육 목적으로만 사용합니다."""
+st.text_area("교재를 보고 여기에 적습니다", value=출처_기본값, height=170, key="출처")
+st.caption("이 데이터를 올린 사람은 원본 데이터가 어디서 왔는지 밝히지 않았고, 교육 목적으로만 사용하라고 적어 두었습니다. "
+           "이름이나 생년월일이 없어 실제 환자를 찾아낼 수는 없지만, 출처를 알 수 없는 데이터로 얻은 결과를 "
+           "실제 의학적 판단에 사용해서는 안 됩니다.")
