@@ -1,4 +1,3 @@
-```python
 # main.py — 뇌졸중 예측 실습실
 
 import pandas as pd
@@ -186,4 +185,3 @@ st.caption(
     "이 데이터로 만든 예측 결과를 실제 의학적 판단에 "
     "사용해서는 안 됩니다."
 )
-```
